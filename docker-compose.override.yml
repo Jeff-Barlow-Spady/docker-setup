@@ -1,0 +1,33 @@
+# Development overrides
+services:
+  caddy:
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data:/data
+    ports:
+      - "8080:80"  # Different port for development
+
+  gpio-service:
+    build:
+      context: ./services/gpio
+      dockerfile: Dockerfile
+    volumes:
+      - ./services/gpio:/app:ro
+    environment:
+      - DEBUG=1
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8000:8000"
+
+  metrics-service:
+    volumes:
+      - ./services/metrics:/app:ro
+    environment:
+      - DEBUG=1
+      - PYTHONUNBUFFERED=1
+
+  postgis:
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=dev_password

@@ -1,0 +1,43 @@
+{
+    admin :2019
+    auto_https off
+}
+
+:80 {
+    # Static file and GeoJSON serving
+    handle /data/* {
+        root * /data
+        file_server browse {
+            precompressed zstd br gzip
+        }
+        header {
+            Content-Type {
+                application/geo+json .geojson
+                text/html .html
+            }
+        }
+    }
+
+    # WebSocket endpoint for GPIO
+    handle /ws/* {
+        reverse_proxy localhost:8080
+    }
+
+    # Basic status endpoint
+    handle /status {
+        respond "OK" 200
+    }
+
+    # Catch-all handler
+    handle {
+        respond "Edge Device API Server" 200
+    }
+
+    log {
+        output stdout
+        format console
+        level INFO
+    }
+
+    encode zstd gzip
+}
