@@ -1,4 +1,5 @@
-# Binaries for programs and plugins
+# Binaries and build artifacts
+bin/
 *.exe
 *.exe~
 *.dll
@@ -10,15 +11,60 @@
 
 # Output of the go coverage tool
 *.out
+*.html
 
-# Go workspace file
-go.work
+# Dependency directories
+vendor/
 
-# Dependencies
-/vendor/
-
-# IDEs and editors
+# IDE specific files
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
+
+# Environment files
+.env
+*.env
+!.env.example
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# Docker volumes
+data/
+!data/.gitkeep
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.priv
+
+# Build artifacts
+coverage.out
+coverage.html
+
+# Debug files
+__debug_bin
+debug.test
+
+# Project specific
+secrets/
+!secrets/.gitkeep

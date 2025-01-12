@@ -4,7 +4,37 @@
 }
 
 :80 {
-    # Static file and GeoJSON serving
+    # Serve the UI
+    handle / {
+        root * /data
+        try_files {path} /index.html
+        file_server
+    }
+
+    # Authentication Service
+    handle /auth/* {
+        uri strip_prefix /auth
+        reverse_proxy auth-service:8000
+    }
+
+    # GPIO Service
+    handle /gpio/* {
+        uri strip_prefix /gpio
+        reverse_proxy gpio-service:8000
+    }
+
+    # Metrics Service
+    handle /metrics/* {
+        uri strip_prefix /metrics
+        reverse_proxy metrics-service:8000
+    }
+
+    # WebSocket endpoint for GPIO
+    handle /ws/gpio {
+        reverse_proxy gpio-service:8000
+    }
+
+    # File Management
     handle /data/* {
         root * /data
         file_server browse {
@@ -15,22 +45,57 @@
                 application/geo+json .geojson
                 text/html .html
             }
+            Access-Control-Allow-Origin *
+            Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+            Access-Control-Allow-Headers "Origin, Content-Type, Accept, Authorization"
         }
     }
 
-    # WebSocket endpoint for GPIO
-    handle /ws/* {
-        reverse_proxy localhost:8080
+    # File Upload
+    handle /data/upload {
+        reverse_proxy auth-service:8000
     }
 
-    # Basic status endpoint
-    handle /status {
-        respond "OK" 200
+    # Health check endpoint
+    handle /health {
+        respond 200 {
+            body "OK"
+            close
+        }
     }
 
-    # Catch-all handler
-    handle {
-        respond "Edge Device API Server" 200
+    # API documentation
+    handle /docs {
+        respond 200 {
+            content-type text/html
+            body "
+                <h1>Edge Device API</h1>
+                <h2>Authentication</h2>
+                <ul>
+                    <li>POST /auth/register - Register new user</li>
+                    <li>POST /auth/login - Login user</li>
+                    <li>GET /auth/verify - Verify token</li>
+                </ul>
+                <h2>GPIO</h2>
+                <ul>
+                    <li>POST /gpio/pin/{id}/setup - Configure pin</li>
+                    <li>POST /gpio/pin/{id}/write - Write to pin</li>
+                    <li>GET /gpio/pin/{id}/read - Read from pin</li>
+                    <li>WS /ws/gpio - Real-time GPIO updates</li>
+                </ul>
+                <h2>Metrics</h2>
+                <ul>
+                    <li>GET /metrics/system - System metrics</li>
+                    <li>GET /metrics/health - Health status</li>
+                </ul>
+                <h2>File Management</h2>
+                <ul>
+                    <li>GET /data/* - Browse files</li>
+                    <li>POST /data/upload - Upload file</li>
+                    <li>DELETE /data/{filename} - Delete file</li>
+                </ul>
+            "
+        }
     }
 
     log {

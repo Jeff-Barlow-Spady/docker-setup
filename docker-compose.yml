@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   caddy:
     image: caddy:2-alpine
@@ -8,20 +10,23 @@ services:
       - "443:443"
       - "2019:2019"
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./data:/data
       - caddy_config:/config
-      - /dev:/dev
-    privileged: true
-    devices:
-      - "/dev/gpiomem:/dev/gpiomem"
-      - "/dev/i2c-1:/dev/i2c-1"
+    networks:
+      - edge-network
     depends_on:
+      - auth-service
       - gpio-service
       - metrics-service
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   postgis:
-    image: arm32v7/postgres:15-alpine
+    image: postgis/postgis:15-3.3-alpine
     platform: linux/arm/v7
     restart: unless-stopped
     environment:
@@ -31,13 +36,44 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d
-    ports:
-      - "5432:5432"
+    networks:
+      - edge-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gisuser} -d ${POSTGRES_DB:-gisdb}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  auth-service:
+    build:
+      context: ./services/auth
+      dockerfile: Dockerfile
+      platforms:
+        - linux/arm/v7
+    restart: unless-stopped
+    environment:
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - DEBUG=${DEBUG:-0}
+      - POSTGRES_HOST=postgis
+      - POSTGRES_DB=${POSTGRES_DB:-gisdb}
+      - POSTGRES_USER=${POSTGRES_USER:-gisuser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-temppwd}
+    networks:
+      - edge-network
+    depends_on:
+      - postgis
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   gpio-service:
-    build: 
+    build:
       context: ./services/gpio
-      platform: linux/arm/v7
+      dockerfile: Dockerfile
+      platforms:
+        - linux/arm/v7
     restart: unless-stopped
     privileged: true
     devices:
@@ -46,15 +82,20 @@ services:
     environment:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - DEBUG=${DEBUG:-0}
-    ports:
-      - "8000:8000"
-    depends_on:
-      - postgis
+    networks:
+      - edge-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   metrics-service:
     build:
       context: ./services/metrics
-      platform: linux/arm/v7
+      dockerfile: Dockerfile
+      platforms:
+        - linux/arm/v7
     restart: unless-stopped
     environment:
       - POSTGRES_HOST=postgis
@@ -62,15 +103,21 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-gisuser}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-temppwd}
       - METRICS_UPDATE_INTERVAL=15s
-    ports:
-      - "8001:8000"
+    networks:
+      - edge-network
     depends_on:
       - postgis
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   caddy_config:
   postgres_data:
 
 networks:
-  default:
+  edge-network:
     name: edge-network
+    driver: bridge
