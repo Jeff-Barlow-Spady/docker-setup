@@ -4,23 +4,27 @@
 }
 
 :80 {
-    # Static file and GeoJSON serving
-    handle /data/* {
+    # Static file server
+    handle /files/* {
         root * /data
         file_server browse {
             precompressed zstd br gzip
         }
-        header {
-            Content-Type {
-                application/geo+json .geojson
-                text/html .html
-            }
-        }
     }
 
-    # WebSocket endpoint for GPIO
-    handle /ws/* {
-        reverse_proxy localhost:8080
+    # Auth Service
+    handle /auth/* {
+        reverse_proxy auth-service:8001
+    }
+
+    # GPIO WebSocket and API
+    handle /gpio/* {
+        reverse_proxy gpio-service:8000
+    }
+
+    # Gitea
+    handle /git/* {
+        reverse_proxy gitea:3000
     }
 
     # Basic status endpoint

@@ -1,7 +1,8 @@
+version: '3.8'
+
 services:
   caddy:
     image: caddy:2-alpine
-    platform: linux/arm/v7
     restart: unless-stopped
     ports:
       - "80:80"
@@ -18,26 +19,26 @@ services:
       - "/dev/i2c-1:/dev/i2c-1"
     depends_on:
       - gpio-service
-      - metrics-service
+      - gitea
 
   postgis:
-    image: arm32v7/postgres:15-alpine
-    platform: linux/arm/v7
+    image: postgis/postgis:15-3.3-alpine
     restart: unless-stopped
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-gisdb}
       - POSTGRES_USER=${POSTGRES_USER:-gisuser}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-temppwd}
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
+    secrets:
+      - db_password
 
   gpio-service:
     build: 
       context: ./services/gpio
-      platform: linux/arm/v7
     restart: unless-stopped
     privileged: true
     devices:
@@ -45,32 +46,64 @@ services:
       - "/dev/i2c-1:/dev/i2c-1"
     environment:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-      - DEBUG=${DEBUG:-0}
+      - DB_HOST=postgis
+      - DB_NAME=${POSTGRES_DB:-gisdb}
+      - DB_USER=${POSTGRES_USER:-gisuser}
+      - DB_PASSWORD_FILE=/run/secrets/db_password
     ports:
       - "8000:8000"
     depends_on:
       - postgis
+    secrets:
+      - db_password
 
-  metrics-service:
+  auth-service:
     build:
-      context: ./services/metrics
-      platform: linux/arm/v7
+      context: ./services/auth
     restart: unless-stopped
     environment:
-      - POSTGRES_HOST=postgis
-      - POSTGRES_DB=${POSTGRES_DB:-gisdb}
-      - POSTGRES_USER=${POSTGRES_USER:-gisuser}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-temppwd}
-      - METRICS_UPDATE_INTERVAL=15s
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - DB_HOST=postgis
+      - DB_NAME=${POSTGRES_DB:-gisdb}
+      - DB_USER=${POSTGRES_USER:-gisuser}
+      - DB_PASSWORD_FILE=/run/secrets/db_password
     ports:
-      - "8001:8000"
+      - "8001:8001"
     depends_on:
       - postgis
+    secrets:
+      - db_password
+
+  gitea:
+    image: gitea/gitea:1.21-rootless
+    restart: unless-stopped
+    environment:
+      - GITEA__database__DB_TYPE=postgres
+      - GITEA__database__HOST=postgis:5432
+      - GITEA__database__NAME=${POSTGRES_DB:-gisdb}
+      - GITEA__database__USER=${POSTGRES_USER:-gisuser}
+      - GITEA__database__PASSWD_FILE=/run/secrets/db_password
+    volumes:
+      - gitea_data:/var/lib/gitea
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgis
+    secrets:
+      - db_password
 
 volumes:
-  caddy_config:
   postgres_data:
+  caddy_config:
+  gitea_data:
+
+secrets:
+  db_password:
+    file: ./secrets/db_password
 
 networks:
   default:
     name: edge-network
+    external: true

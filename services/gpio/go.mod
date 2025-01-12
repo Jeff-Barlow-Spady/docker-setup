@@ -1,6 +1,6 @@
 module github.com/Jeff-Barlow-Spady/docker-setup/services/gpio
 
-go 1.23.4
+go 1.22
 
 require (
 	github.com/fasthttp/websocket v1.5.12

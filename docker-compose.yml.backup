@@ -1,0 +1,76 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    platform: linux/arm/v7
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "2019:2019"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./data:/data
+      - caddy_config:/config
+      - /dev:/dev
+    privileged: true
+    devices:
+      - "/dev/gpiomem:/dev/gpiomem"
+      - "/dev/i2c-1:/dev/i2c-1"
+    depends_on:
+      - gpio-service
+      - metrics-service
+
+  postgis:
+    image: arm32v7/postgres:15-alpine
+    platform: linux/arm/v7
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-gisdb}
+      - POSTGRES_USER=${POSTGRES_USER:-gisuser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-temppwd}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+
+  gpio-service:
+    build: 
+      context: ./services/gpio
+      platform: linux/arm/v7
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - "/dev/gpiomem:/dev/gpiomem"
+      - "/dev/i2c-1:/dev/i2c-1"
+    environment:
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - DEBUG=${DEBUG:-0}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgis
+
+  metrics-service:
+    build:
+      context: ./services/metrics
+      platform: linux/arm/v7
+    restart: unless-stopped
+    environment:
+      - POSTGRES_HOST=postgis
+      - POSTGRES_DB=${POSTGRES_DB:-gisdb}
+      - POSTGRES_USER=${POSTGRES_USER:-gisuser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-temppwd}
+      - METRICS_UPDATE_INTERVAL=15s
+    ports:
+      - "8001:8000"
+    depends_on:
+      - postgis
+
+volumes:
+  caddy_config:
+  postgres_data:
+
+networks:
+  default:
+    name: edge-network
