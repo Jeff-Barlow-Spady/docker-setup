@@ -1,33 +1,60 @@
-# Development overrides
 services:
   caddy:
+    platform: linux/amd64
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./data:/data
+      - ./caddy/logs:/var/log/caddy
     ports:
       - "8080:80"  # Different port for development
+    environment:
+      - DEBUG=1
 
   gpio-service:
+    platform: linux/amd64
     build:
       context: ./services/gpio
       dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
     volumes:
       - ./services/gpio:/app:ro
+      - ./services/gpio/logs:/var/log/gpio
     environment:
       - DEBUG=1
       - PYTHONUNBUFFERED=1
+      - DEVELOPMENT=1
     ports:
       - "8000:8000"
+    security_opt:
+      - seccomp=unconfined
+    cap_add:
+      - SYS_PTRACE
+    command: ["python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "app.py"]
 
   metrics-service:
+    platform: linux/amd64
+    build:
+      platforms:
+        - linux/amd64
     volumes:
       - ./services/metrics:/app:ro
+      - ./services/metrics/logs:/var/log/metrics
     environment:
       - DEBUG=1
       - PYTHONUNBUFFERED=1
+      - DEVELOPMENT=1
+    ports:
+      - "8001:8000"
+      - "5679:5678"  # Debug port
 
   postgis:
+    platform: linux/amd64
     ports:
       - "5432:5432"
     environment:
       - POSTGRES_PASSWORD=dev_password
+      - POSTGRES_DB=dev_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d

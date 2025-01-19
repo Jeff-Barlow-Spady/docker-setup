@@ -1,6 +1,22 @@
 # Edge Device Monitoring System
 
-A comprehensive monitoring system for edge devices, built with Go and designed for ARM architectures (Raspberry Pi).
+A comprehensive monitoring system for edge devices, built with Go and optimized for ARM64 architectures (Raspberry Pi). The system follows standard Go project layout and provides robust monitoring capabilities for edge devices.
+
+## Architecture Overview
+
+The system is built using a microservices architecture with three core services:
+- Authentication Service: Handles user authentication and authorization
+- GPIO Service: Manages hardware interaction and monitoring
+- Metrics Service: Collects and exposes system metrics
+
+Each service is independently deployable and follows the same structure:
+```
+services/
+├── cmd/            # Main applications
+├── internal/       # Private application code
+├── pkg/            # Public libraries
+└── api/            # API definitions
+```
 
 ## Features
 
@@ -46,12 +62,22 @@ make run       # Start services
 ```
 .
 ├── services/
-│   ├── auth/       # Authentication service
-│   ├── gpio/       # GPIO control service
-│   └── metrics/    # System metrics service
-├── docs/           # Documentation
-├── caddy/         # Reverse proxy configuration
-└── docker/        # Docker configurations
+│   ├── auth/              # Authentication service
+│   │   ├── cmd/
+│   │   │   └── auth/      # Main application
+│   │   ├── internal/      # Private implementation
+│   │   │   ├── auth/      # Auth logic
+│   │   │   └── server/    # HTTP server
+│   │   └── pkg/           # Public packages
+│   ├── gpio/              # GPIO control service
+│   │   ├── cmd/gpio/      # Main application
+│   │   └── internal/      # Private implementation
+│   └── metrics/           # System metrics service
+│       ├── cmd/metrics/   # Main application
+│       └── internal/      # Private implementation
+├── docs/                  # Documentation
+├── caddy/                 # Reverse proxy configuration
+└── docker/                # Docker configurations
 ```
 
 ### Building
@@ -79,14 +105,37 @@ make fmt              # Format code
 
 ### Production
 
-1. Build for ARM:
+1. Configure Builder (one-time setup):
 ```bash
-make docker-build PLATFORMS=linux/arm/v7
+docker buildx create --name arm64builder --driver docker-container --platform linux/amd64,linux/arm64,linux/arm/v7 --use
+docker buildx inspect arm64builder --bootstrap
 ```
 
-2. Deploy:
+2. Build for ARM64:
 ```bash
+# Build all services
+make docker-build PLATFORMS=linux/arm64
+
+# Build specific service
+docker buildx build --platform linux/arm64 -t myregistry/auth-service:latest --push ./services/auth
+```
+
+3. Deploy:
+```bash
+# Using docker compose
 docker compose up -d
+
+# Or individual services
+docker run -d --name auth-service -p 8080:8080 myregistry/auth-service:latest
+```
+
+4. Verify Deployment:
+```bash
+# Check service status
+docker ps
+
+# View logs
+docker logs -f auth-service
 ```
 
 ### Development

@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   caddy:
     image: caddy:2-alpine
-    platform: linux/arm/v7
+    platform: linux/arm64
     restart: unless-stopped
     ports:
       - "80:80"
@@ -26,8 +24,8 @@ services:
       retries: 3
 
   postgis:
-    image: postgis/postgis:15-3.3-alpine
-    platform: linux/arm/v7
+    image: postgis/postgis:15-3.3
+    platform: linux/arm64
     restart: unless-stopped
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-gisdb}
@@ -49,7 +47,8 @@ services:
       context: ./services/auth
       dockerfile: Dockerfile
       platforms:
-        - linux/arm/v7
+        - linux/arm64
+        - linux/amd64
     restart: unless-stopped
     environment:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
@@ -73,7 +72,8 @@ services:
       context: ./services/gpio
       dockerfile: Dockerfile
       platforms:
-        - linux/arm/v7
+        - linux/arm64
+        - linux/amd64
     restart: unless-stopped
     privileged: true
     devices:
@@ -95,7 +95,8 @@ services:
       context: ./services/metrics
       dockerfile: Dockerfile
       platforms:
-        - linux/arm/v7
+        - linux/arm64
+        - linux/amd64
     restart: unless-stopped
     environment:
       - POSTGRES_HOST=postgis

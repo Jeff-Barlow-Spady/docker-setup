@@ -3,7 +3,7 @@
 # Variables
 DOCKER_REGISTRY ?= your-registry
 VERSION ?= $(shell git describe --tags --always --dirty)
-PLATFORMS ?= linux/arm/v7,linux/amd64
+PLATFORMS ?= linux/arm64,linux/arm/v7,linux/amd64
 
 # Go related variables
 GOBASE := $(shell pwd)

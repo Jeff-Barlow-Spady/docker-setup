@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.22-alpine as builder
+FROM --platform=$BUILDPLATFORM golang:1.22-alpine AS builder
 
 # Add build arguments for cross-compilation
 ARG TARGETARCH
@@ -6,25 +6,30 @@ ARG TARGETOS
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 
-WORKDIR /build
+WORKDIR /app
 
-# Add build tools
+# Add build tools and enable Go modules
 RUN apk add --no-cache git
+ENV GO111MODULE=on
 
-# Copy module files
-COPY go.* ./
+# Copy only the module files first
+COPY go.mod go.sum ./
 
 # Download dependencies
-RUN GOWORK=off go mod download
+RUN go mod download
 
-# Copy source
+# Copy the entire source tree
 COPY . .
 
-# Build with proper GOARCH
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -v -o auth
+# Build the application with proper arch support
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -v -o /app/auth ./cmd/auth
 
+# Create minimal production image
 FROM --platform=$TARGETPLATFORM alpine:latest
+
 WORKDIR /app
-COPY --from=builder /build/auth .
+COPY --from=builder /app/auth .
+
+# Configure container
 EXPOSE 8000
 CMD ["./auth"]
